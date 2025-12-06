@@ -24,7 +24,19 @@ export default function RootLayout({
     return (
         <html lang="en" className="dark">
             <body className="min-h-screen bg-background text-surface antialiased">
-                <Providers>{children}</Providers>
+                {/* Skip to main content - accessibility feature */}
+                <a
+                    href="#main-content"
+                    className="skip-to-content"
+                >
+                    Skip to main content
+                </a>
+
+                <Providers>
+                    <main id="main-content" tabIndex={-1}>
+                        {children}
+                    </main>
+                </Providers>
             </body>
         </html>
     );
