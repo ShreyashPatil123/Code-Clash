@@ -16,6 +16,7 @@ datasource db {
 // ============================================
 
 enum ChallengeStatus {
+  PENDING
   DRAFT
   UPCOMING
   ACTIVE
@@ -50,10 +51,11 @@ model User {
   sessions Session[]
 
   // App Relations
-  groupMemberships  GroupMember[]
-  createdGroups     Group[]       @relation("GroupCreator")
-  createdChallenges Challenge[]   @relation("ChallengeCreator")
-  submissions       Submission[]
+  groupMemberships   GroupMember[]
+  createdGroups      Group[]             @relation("GroupCreator")
+  createdChallenges  Challenge[]         @relation("ChallengeCreator")
+  submissions        Submission[]
+  challengeApprovals ChallengeApproval[]
   votes             Vote[]
   aiAnalyses        AIAnalysis[]
 
@@ -125,6 +127,7 @@ model GroupMember {
   id       String   @id @default(cuid())
   groupId  String   @map("group_id")
   userId   String   @map("user_id")
+  isAdmin  Boolean  @default(false) @map("is_admin")
   joinedAt DateTime @default(now()) @map("joined_at")
 
   // Relations
@@ -160,10 +163,28 @@ model Challenge {
   createdBy   User         @relation("ChallengeCreator", fields: [createdById], references: [id])
   submissions Submission[]
   votes       Vote[]
+  approvals   ChallengeApproval[]
 
   @@index([groupId, status])
   @@index([endDate])
   @@map("challenges")
+}
+
+/// Approval votes for pending challenges
+model ChallengeApproval {
+  id          String   @id @default(cuid())
+  challengeId String   @map("challenge_id")
+  userId      String   @map("user_id")
+  approved    Boolean
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, userId])
+  @@index([challengeId])
+  @@map("challenge_approvals")
 }
 
 /// A project submitted to a challenge

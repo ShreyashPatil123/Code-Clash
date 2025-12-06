@@ -8,6 +8,7 @@ interface ChallengeStatusBadgeProps {
 }
 
 const statusConfig: Record<ChallengeStatus, { color: string; text: string }> = {
+    PENDING: { color: 'purple', text: 'Pending Approval' },
     DRAFT: { color: 'default', text: 'Draft' },
     UPCOMING: { color: 'blue', text: 'Upcoming' },
     ACTIVE: { color: 'green', text: 'Active' },

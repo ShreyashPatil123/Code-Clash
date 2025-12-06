@@ -117,14 +117,7 @@ export async function POST(
 
         const { title, description, startDate, endDate, weights } = validatedData.data;
 
-        // Determine initial status
-        const now = new Date();
-        const start = new Date(startDate);
-        let status: 'UPCOMING' | 'ACTIVE' = 'UPCOMING';
-        if (start <= now) {
-            status = 'ACTIVE';
-        }
-
+        // Create challenge with PENDING status (needs member approval)
         const challenge = await prisma.challenge.create({
             data: {
                 groupId,
@@ -137,15 +130,49 @@ export async function POST(
                 weightUiDesign: weights.uiDesign,
                 weightCreativity: weights.creativity,
                 weightCodeQuality: weights.codeQuality,
-                status,
+                status: 'PENDING',
             },
         });
+
+        // Auto-approve from the creator
+        await prisma.challengeApproval.create({
+            data: {
+                challengeId: challenge.id,
+                userId,
+                approved: true,
+            },
+        });
+
+        // Check if this is a solo group (auto-activate)
+        const memberCount = await prisma.groupMember.count({
+            where: { groupId },
+        });
+
+        if (memberCount === 1) {
+            // Solo group - auto-activate
+            const now = new Date();
+            const start = new Date(startDate);
+            const newStatus = start <= now ? 'ACTIVE' : 'UPCOMING';
+
+            await prisma.challenge.update({
+                where: { id: challenge.id },
+                data: { status: newStatus },
+            });
+
+            return NextResponse.json({
+                id: challenge.id,
+                title: challenge.title,
+                status: newStatus,
+                createdAt: challenge.createdAt,
+            });
+        }
 
         return NextResponse.json({
             id: challenge.id,
             title: challenge.title,
             status: challenge.status,
             createdAt: challenge.createdAt,
+            message: 'Challenge created. Waiting for member approval (60% threshold).',
         });
     } catch (error) {
         console.error('Error creating challenge:', error);
