@@ -5,3 +5,4 @@ export { HeroScene3D } from './HeroScene3D';
 export { Canvas3D } from './Canvas3D';
 export { FloatingCodeBlocks } from './FloatingCodeBlocks';
 export { ParticleField } from './ParticleField';
+export { Leaderboard3D } from './Leaderboard3D';
