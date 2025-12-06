@@ -1,0 +1,6 @@
+GITHUB_CLIENT_ID=Ov23lix0vxQJDTVSiP8D
+GITHUB_CLIENT_SECRET=your_github_secret_here
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=codeclash-secret-key-change-in-production
+DATABASE_URL=postgresql://postgres.wbjatehztkikrxththra:RA9aITUjzFEeJTSx@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true
+DIRECT_URL=postgresql://postgres.wbjatehztkikrxththra:RA9aITUjzFEeJTSx@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres

@@ -1,0 +1,258 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum ChallengeStatus {
+  DRAFT
+  UPCOMING
+  ACTIVE
+  VOTING
+  COMPLETED
+}
+
+enum SubmissionStatus {
+  NOT_SUBMITTED
+  SUBMITTED
+  UNDER_REVIEW
+  SCORED
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+/// User account linked to GitHub OAuth
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  githubUsername String   @unique @map("github_username")
+  githubId       String   @unique @map("github_id")
+  avatarUrl      String?  @map("avatar_url")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // NextAuth Relations
+  accounts Account[]
+  sessions Session[]
+
+  // App Relations
+  groupMemberships  GroupMember[]
+  createdGroups     Group[]       @relation("GroupCreator")
+  createdChallenges Challenge[]   @relation("ChallengeCreator")
+  submissions       Submission[]
+  votes             Vote[]
+  aiAnalyses        AIAnalysis[]
+
+  @@map("users")
+}
+
+// NextAuth Account model
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+// NextAuth Session model
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// NextAuth VerificationToken model
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+/// A group of users competing together
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  inviteCode  String   @unique @map("invite_code") @db.VarChar(8)
+  createdById String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  createdBy  User          @relation("GroupCreator", fields: [createdById], references: [id])
+  members    GroupMember[]
+  challenges Challenge[]
+
+  @@index([inviteCode])
+  @@map("groups")
+}
+
+/// Junction table for User <-> Group many-to-many
+model GroupMember {
+  id       String   @id @default(cuid())
+  groupId  String   @map("group_id")
+  userId   String   @map("user_id")
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  // Relations
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("group_members")
+}
+
+/// A coding challenge within a group
+model Challenge {
+  id          String          @id @default(cuid())
+  groupId     String          @map("group_id")
+  createdById String          @map("created_by")
+  title       String          @db.VarChar(100)
+  description String          @db.Text
+  startDate   DateTime        @map("start_date")
+  endDate     DateTime        @map("end_date")
+
+  // Scoring weights (must sum to 10)
+  weightFunctionality Int @default(4) @map("weight_functionality")
+  weightUiDesign      Int @default(3) @map("weight_ui_design")
+  weightCreativity    Int @default(2) @map("weight_creativity")
+  weightCodeQuality   Int @default(1) @map("weight_code_quality")
+
+  status    ChallengeStatus @default(UPCOMING)
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  // Relations
+  group       Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy   User         @relation("ChallengeCreator", fields: [createdById], references: [id])
+  submissions Submission[]
+  votes       Vote[]
+
+  @@index([groupId, status])
+  @@index([endDate])
+  @@map("challenges")
+}
+
+/// A project submitted to a challenge
+model Submission {
+  id           String           @id @default(cuid())
+  challengeId  String           @map("challenge_id")
+  userId       String           @map("user_id")
+  projectTitle String           @map("project_title") @db.VarChar(100)
+  description  String           @db.Text
+  githubUrl    String           @map("github_url")
+  liveUrl      String?          @map("live_url")
+  techStack    String[]         @map("tech_stack")
+  status       SubmissionStatus @default(SUBMITTED)
+  finalScore   Float?           @map("final_score")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  challenge     Challenge      @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id])
+  selectedFiles SelectedFile[]
+  votes         Vote[]
+  aiAnalyses    AIAnalysis[]
+
+  @@unique([challengeId, userId])
+  @@index([challengeId])
+  @@map("submissions")
+}
+
+/// Files selected for AI analysis from GitHub repo
+model SelectedFile {
+  id           String @id @default(cuid())
+  submissionId String @map("submission_id")
+  filePath     String @map("file_path")
+
+  // Relations
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, filePath])
+  @@map("selected_files")
+}
+
+/// Peer vote on a submission
+model Vote {
+  id           String @id @default(cuid())
+  challengeId  String @map("challenge_id")
+  submissionId String @map("submission_id")
+  voterId      String @map("voter_id")
+
+  // Scores per category
+  scoreFunctionality Int @map("score_functionality")
+  scoreUiDesign      Int @map("score_ui_design")
+  scoreCreativity    Int @map("score_creativity")
+  scoreCodeQuality   Int @map("score_code_quality")
+
+  // Computed total (sum of all scores, max 10)
+  totalScore Int      @map("total_score")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  challenge  Challenge  @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  voter      User       @relation(fields: [voterId], references: [id])
+
+  @@unique([submissionId, voterId])
+  @@index([challengeId])
+  @@index([voterId])
+  @@map("votes")
+}
+
+/// AI-generated analysis of a submission
+model AIAnalysis {
+  id            String @id @default(cuid())
+  submissionId  String @map("submission_id")
+  triggeredById String @map("triggered_by")
+
+  // AI scores (0.0 - 10.0 scale)
+  scoreFunctionality Float @map("score_functionality")
+  scoreUiDesign      Float @map("score_ui_design")
+  scoreCreativity    Float @map("score_creativity")
+  scoreCodeQuality   Float @map("score_code_quality")
+
+  feedback   String   @db.Text
+  analyzedAt DateTime @default(now()) @map("analyzed_at")
+
+  // Relations
+  submission  Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  triggeredBy User       @relation(fields: [triggeredById], references: [id])
+
+  @@index([submissionId, analyzedAt])
+  @@map("ai_analyses")
+}
