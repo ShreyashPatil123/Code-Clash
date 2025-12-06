@@ -3,3 +3,5 @@ export { BentoGrid, BentoItem } from './BentoGrid';
 export { GradientButton } from './GradientButton';
 export { HeroSection, GradientText } from './HeroSection';
 export { AnimatedCounter } from './AnimatedCounter';
+export { SkipToContent, useReducedMotion, MotionSafe } from './Accessibility';
+export { OptimizedImage, useLazyLoad, LazyLoad } from './Performance';
