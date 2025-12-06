@@ -10,9 +10,11 @@ import {
     TrophyOutlined,
     TeamOutlined,
     ThunderboltOutlined,
+    LogoutOutlined,
 } from '@ant-design/icons';
 import { AppShell } from '@/components/layout';
-import { ChallengeCard } from '@/components/challenges';
+import { ChallengeCard, ChallengeApprovalCard } from '@/components/challenges';
+import { LeaveGroupButton } from '@/components/groups';
 import { ChallengeStatus } from '@/types';
 
 interface GroupDashboardClientProps {
@@ -78,8 +80,23 @@ export function GroupDashboardClient({
     const activeChallenges = group.challenges.filter(
         (c) => c.status === 'ACTIVE' || c.status === 'VOTING'
     );
+    const pendingChallenges = group.challenges.filter((c) => c.status === 'PENDING');
     const upcomingChallenges = group.challenges.filter((c) => c.status === 'UPCOMING');
     const completedChallenges = group.challenges.filter((c) => c.status === 'COMPLETED');
+
+    // Handle challenge approval
+    const handleApprove = async (challengeId: string, approved: boolean) => {
+        const response = await fetch(`/api/challenges/${challengeId}/approve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approved }),
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error?.message || 'Failed to vote');
+        }
+    };
 
     const tabItems = [
         {
@@ -92,6 +109,32 @@ export function GroupDashboardClient({
             ),
             children: (
                 <div className="space-y-6">
+                    {/* Pending Approval Challenges */}
+                    {pendingChallenges.length > 0 && (
+                        <div>
+                            <h3 className="mb-4 text-lg font-semibold text-surface flex items-center gap-2">
+                                <span className="animate-pulse w-2 h-2 rounded-full bg-purple-500" />
+                                Pending Approval ({pendingChallenges.length})
+                            </h3>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {pendingChallenges.map((challenge) => (
+                                    <ChallengeApprovalCard
+                                        key={challenge.id}
+                                        challenge={challenge}
+                                        approvalStatus={{
+                                            totalMembers: group.members.length,
+                                            approvedCount: 1, // Creator auto-approved
+                                            rejectedCount: 0,
+                                            threshold: Math.ceil(group.members.length * 0.6),
+                                            userVote: challenge.createdBy.id === currentUserId ? true : null,
+                                        }}
+                                        onApprove={handleApprove}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Active Challenges */}
                     {activeChallenges.length > 0 && (
                         <div>
@@ -245,6 +288,12 @@ export function GroupDashboardClient({
                                 New Challenge
                             </Button>
                         </Link>
+                        <LeaveGroupButton
+                            groupId={group.id}
+                            groupName={group.name}
+                            isAdmin={group.createdBy.id === currentUserId}
+                            memberCount={group.members.length}
+                        />
                     </div>
                 </motion.div>
 
